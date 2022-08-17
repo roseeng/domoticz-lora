@@ -22,7 +22,7 @@ String rssi = "RSSI --";
 String packSize = "--";
 String packet ;
 
-void loraData(){
+void refreshScreen(){
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
@@ -33,12 +33,16 @@ void loraData(){
   display.display();
 }
 
-void cbk(int packetSize) {
+void onReceive(int packetSize) {
+  Serial.println("onReceive");
+
   packet ="";
   packSize = String(packetSize,DEC);
-  for (int i = 0; i < packetSize; i++) { packet += (char) LoRa.read(); }
+  for (int i = 0; i < packetSize; i++) { 
+    packet += (char) LoRa.read(); 
+  }
   rssi = "RSSI " + String(LoRa.packetRssi(), DEC) ;
-  loraData();
+  refreshScreen();
 }
 
 void setup() {
@@ -49,30 +53,42 @@ void setup() {
   
   Serial.begin(115200);
   while (!Serial);
+  delay(1500);
+
   Serial.println();
   Serial.println("Domoticz-LoRa Beach node ver 0.1");
   
-  SPI.begin(SCK,MISO,MOSI,SS);
-  LoRa.setPins(SS,RST,DI0);  
+  pinMode(DI0, INPUT);
+  SPI.begin(SCK, MISO, MOSI, SS);
+  LoRa.setPins(SS, RST, DI0);  
   if (!LoRa.begin(BAND)) {
     Serial.println("Starting LoRa failed!");
     while (1);
   }
 
-  //LoRa.onReceive(cbk);
-  LoRa.receive();
-  Serial.println("init ok");
   display.init();
   display.flipScreenVertically();  
   display.setFont(ArialMT_Plain_10);
   
   delay(1500);
+
+  display.clear();
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.drawString(0, 0, "-- LoRa Beach node --"); 
+  display.display();
+
+  LoRa.onReceive(onReceive);
+  LoRa.receive();
+  
+  Serial.println("init ok - listening...");
 }
 
 void loop() {
+  /*
   int packetSize = LoRa.parsePacket();
   if (packetSize) { 
-    cbk(packetSize);  
+    onReceive(packetSize);  
   }
   delay(10);
+  */
 }
