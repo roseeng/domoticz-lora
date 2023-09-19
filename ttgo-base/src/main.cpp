@@ -8,7 +8,7 @@
 
 #include "SSD1306.h" 
 #include "ttgov21new.h"
-#include "Secrets/secrets.h"
+#include "site.h"
 
 /*
   Detta är den enhet som ska sitta kopplad till Domoticz.
@@ -21,8 +21,11 @@
 
 SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
 
+int switchStatus = -1; // -1 = unknown, 0 = off, 1 = on
+
 WiFiClient wifiClient;
-HttpClient client = HttpClient(wifiClient, "192.168.1.101");
+HttpClient* client;
+int wifiSite;
 
 unsigned int counter = 0;
 String rssi = "RSSI --";
@@ -39,6 +42,25 @@ void onReceive(int packetSize) {
   rssi = "RSSI " + String(LoRa.packetRssi(), DEC);
 
   havePacket = true;
+}
+
+bool ConnectToWifi(String ssid, String password)
+{
+    Serial.printf("Connecting to %s... ", ssid);
+    WiFi.begin(ssid, password);
+    int retry = 20;
+    while (WiFi.status() != WL_CONNECTED && retry-- > 0) {
+        delay(500);
+        Serial.print(".");
+    }
+    if (WiFi.status() != WL_CONNECTED)
+      return false;
+    
+    Serial.print("  CONNECTED to ");
+    Serial.println(ssid);
+    Serial.print("  IP address: ");
+    Serial.println(WiFi.localIP());
+    return true;
 }
 
 void setup() {
@@ -69,41 +91,47 @@ void setup() {
   display.flipScreenVertically();  
   display.setFont(ArialMT_Plain_10);
 
-    //connect to WiFi
-    Serial.printf("Connecting to %s ", Secrets::ssid);
-    WiFi.begin(Secrets::ssid, Secrets::password);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println(" CONNECTED");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+  if (ConnectToWifi(sites[0].ssid, sites[0].password)) {
+    wifiSite = 0;
+  }
+  else if (ConnectToWifi(sites[1].ssid, sites[2].password)) {
+    wifiSite = 1;
+  }
+  else {
+    Serial.println("Failed to connect to wifi!");
+  }
+  client = new HttpClient(wifiClient, sites[wifiSite].host);
 
   delay(1500);  
 
-  // For interrupt-driven:
   LoRa.onReceive(onReceive);
   LoRa.receive();
   
   Serial.println("listening...");
 }
 
-void pollDomoticz()
+int pollDomoticz()
 {
   Serial.println("Calling Domoticz");
+  char switchUrl[256];
+  
+  sprintf(switchUrl, "/json.htm?type=command&param=getdevices&rid=%d", sites[wifiSite].switchIdx);
 
-  client.beginRequest();
-  client.get("/json.htm?type=command&param=getdevices&rid=18");
-  client.sendHeader("Content-Type", "application/json");
+  client->beginRequest();
+  client->get(switchUrl);
+  client->sendHeader("Content-Type", "application/json");
   // client.sendBasicAuth("username", "password");
-  client.endRequest();
+  client->endRequest();
 
-  int statusCode = client.responseStatusCode();
-  String responseBody = client.responseBody();
+  int statusCode = client->responseStatusCode();
+  String responseBody = client->responseBody();
   Serial.print("Response status: ");
   Serial.println(statusCode);
-  //Serial.println("Response:\n" + responseBody);
+
+  if (statusCode != 200) {
+    Serial.println("Response:\n" + responseBody);
+    return -1;
+  }
 
   DynamicJsonDocument doc(3072);
 
@@ -112,58 +140,16 @@ void pollDomoticz()
   if (error) {
     Serial.print("deserializeJson() failed: ");
     Serial.println(error.c_str());
-    return;
+    return -1;
   }
 
   JsonObject result_0 = doc["result"][0];
-  const char* switchStatus = result_0["Data"];
+  const char* status = result_0["Data"];
 
   Serial.print("Switchen är: ");
-  Serial.println(switchStatus);
-}
+  Serial.println(status);
 
-const byte numChars = 32;
-char receivedChars[numChars];
-
-boolean dataToSend = false;
-
-void recvWithStartEndMarkers() {
-    static boolean recvInProgress = false;
-    static byte ndx = 0;
-    char startMarker = '<';
-    char endMarker = '>';
-    char rc;
- 
-    while (Serial.available() > 0 && dataToSend == false) {
-        rc = Serial.read();
-
-        if (recvInProgress == true) {
-            if (rc != endMarker) {
-                receivedChars[ndx] = rc;
-                ndx++;
-                if (ndx >= numChars) {
-                    ndx = numChars - 1;
-                }
-            }
-            else {
-                receivedChars[ndx] = '\0'; // terminate the string
-                recvInProgress = false;
-                ndx = 0;
-                dataToSend = true;
-            }
-        }
-
-        else if (rc == startMarker) {
-            recvInProgress = true;
-        }
-    }
-}
-
-void showNewCommand() {
-    if (dataToSend == true) {
-        Serial.print("Received via serial: ");
-        Serial.println(receivedChars);
-    }
+  return status[1] == 'f' ? 0 : 1; 
 }
 
 void updateDisplay(String header)
@@ -173,8 +159,8 @@ void updateDisplay(String header)
   display.setFont(ArialMT_Plain_10);
 
   display.drawString(0, 0, header);
-  display.drawString(0, 15, "Sending packet: ");
-  display.drawString(90, 15, receivedChars);
+  display.drawString(0, 15, "Switch status: ");
+  display.drawString(90, 15, String(switchStatus, DEC));
   display.drawString(0, 26, rssi);   
   display.drawString(0, 38, "Received: ");
   display.drawString(90, 38, packet);
@@ -184,7 +170,6 @@ void updateDisplay(String header)
 
 void sendLora(String msg)
 {
-    // send packet
     LoRa.beginPacket();
     LoRa.print(msg);
 //    LoRa.print(counter);
@@ -194,18 +179,16 @@ void sendLora(String msg)
 }
 
 void loop() {
- pollDomoticz();
-    delay(10000);
- /*
-  recvWithStartEndMarkers();
+  
+  int newStatus = pollDomoticz();  
+ 
+  if (switchStatus != newStatus) {
+    if (newStatus == 0)
+      sendLora("f1");
+    else if (newStatus == 1)
+      sendLora("n1");
 
-  updateDisplay("-- LoRa Base node --");
-
-  if (dataToSend) {
-    showNewCommand();
-    sendLora(receivedChars);
-    dataToSend = false;
-
+    switchStatus = newStatus;
     counter++;
   }
 
@@ -217,7 +200,9 @@ void loop() {
     havePacket = false;
     digitalWrite(HAS_LED, LOW);  
   }
-*/
-   delay(1000);
+
+  updateDisplay("-- LoRa Base node --");
+
+  delay(1000);
 }
 
