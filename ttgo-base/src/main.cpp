@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include "SSD1306.h" 
 #include "ttgov21new.h"
+#include "Secrets/secrets.h"
 
 /*
   Detta är den enhet som ska sitta kopplad till Domoticz.
@@ -13,9 +14,6 @@
 */
 
 #define BAND  868E6
-
-const char *ssid       = "";
-const char *password   = "";
 
 SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
 
@@ -65,14 +63,16 @@ void setup() {
   display.setFont(ArialMT_Plain_10);
 
     //connect to WiFi
-    Serial.printf("Connecting to %s ", ssid);
-    WiFi.begin(ssid, password);
+    Serial.printf("Connecting to %s ", Secrets::ssid);
+    WiFi.begin(Secrets::ssid, Secrets::password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
     Serial.println(" CONNECTED");
-       
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+           
   delay(1500);  
 
   // For interrupt-driven:
