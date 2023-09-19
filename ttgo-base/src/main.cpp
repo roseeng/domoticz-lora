@@ -101,7 +101,7 @@ void setup() {
   else {
     Serial.println("Failed to connect to wifi!");
   }
-  client = new HttpClient(wifiClient, sites[wifiSite].host);
+  client = new HttpClient(wifiClient, sites[wifiSite].host, sites[wifiSite].port);
 
   delay(1500);  
 
