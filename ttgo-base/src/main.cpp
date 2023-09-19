@@ -9,6 +9,7 @@
 #include "SSD1306.h" 
 #include "ttgov21new.h"
 #include "site.h"
+#include "interval.h"
 
 /*
   Detta är den enhet som ska sitta kopplad till Domoticz.
@@ -178,23 +179,27 @@ void sendLora(String msg)
     LoRa.receive();
 }
 
+Interval switchInterval;
+
 void loop() {
   
-  int newStatus = pollDomoticz();  
- 
-  if (switchStatus != newStatus) {
-    if (newStatus == 0)
-      sendLora("f1");
-    else if (newStatus == 1)
-      sendLora("n1");
+  if (switchInterval.Every(30)) {
+    int newStatus = pollDomoticz();  
+  
+    if (switchStatus != newStatus) {
+      if (newStatus == 0)
+        sendLora("f1");
+      else if (newStatus == 1)
+        sendLora("n1");
 
-    switchStatus = newStatus;
-    counter++;
+      switchStatus = newStatus;
+      counter++;
+    }
   }
 
   if (havePacket)
   {
-    Serial.print("Received: ");
+    Serial.print("Recieved: ");
     Serial.println(packet);
 
     havePacket = false;
