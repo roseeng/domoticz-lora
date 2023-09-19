@@ -15,12 +15,13 @@
 SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
 
 String rssi = "RSSI --";
-String packSize = "--";
 String packet ;
 
 int command = 0; // 1 = Query, 2 = On, 3 = Off
 int lastCommand = 0;
 char myId = '1';
+
+bool lampOn = false;
 
 void refreshScreen()
 {
@@ -28,9 +29,10 @@ void refreshScreen()
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
   display.drawString(0, 0, "-- LoRa Beach node --"); 
-  display.drawString(0 , 15 , "Received "+ packSize + " bytes");
-  display.drawStringMaxWidth(0 , 26 , 128, packet);
-  display.drawString(0, 38, rssi);  
+  display.drawString(0 , 15 , "Received: "+ packet);
+
+  display.drawString(0, 26, rssi);  
+
   if (lastCommand == 1)
     display.drawString(0, 50, "Command: Query");
   if (lastCommand == 2)
@@ -41,11 +43,9 @@ void refreshScreen()
   display.display();
 }
 
-void onReceive(int packetSize) {
-  digitalWrite(HAS_LED, HIGH);  
-  
+void onReceive(int packetSize) {  
   packet ="";
-  packSize = String(packetSize,DEC);
+
   for (int i = 0; i < packetSize; i++) { 
     packet += (char) LoRa.read(); 
   }
@@ -102,7 +102,6 @@ void setup() {
 
 void sendLora(String msg)
 {
-    // send packet
     LoRa.beginPacket();
     LoRa.print(msg);
 //    LoRa.print(counter);
@@ -122,29 +121,36 @@ void loop() {
 
   refreshScreen();
   delay(1000);
-  digitalWrite(HAS_LED, LOW);  
-//  delay(1000);
 
-  if (command ==  1)
+  if (command ==  1) // Query
   {
-    Serial.println("Sending response");
-    sendLora("R142");
+    Serial.println("Command: Query");
+    if (lampOn)
+      sendLora("R1ON");
+    else
+      sendLora("R1OFF");
 
     command = 0;
   }
 
-  if (command ==  2)
+  if (command ==  2) // On
   {
-    Serial.println("Sending response");
-    sendLora("R1OK");
+    digitalWrite(HAS_LED, HIGH);  
+    lampOn = true;
+
+    Serial.println("Command: On");
+    sendLora("R1ON");
 
     command = 0;
   }
 
-  if (command ==  3)
+  if (command ==  3) // Off
   {
-    Serial.println("Sending response");
-    sendLora("R1OK");
+    digitalWrite(HAS_LED, LOW); 
+    lampOn = false; 
+
+    Serial.println("Command: Off");
+    sendLora("R1OFF");
 
     command = 0;
   }    

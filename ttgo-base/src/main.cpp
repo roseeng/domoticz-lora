@@ -2,6 +2,7 @@
 #include <SPI.h>
 #include <LoRa.h>
 #include <Wire.h>  
+#include <WiFi.h>
 #include "SSD1306.h" 
 #include "ttgov21new.h"
 
@@ -13,11 +14,13 @@
 
 #define BAND  868E6
 
+const char *ssid       = "";
+const char *password   = "";
+
 SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
 
 unsigned int counter = 0;
 String rssi = "RSSI --";
-String packSize = "--";
 String packet;
 bool havePacket = false;
 
@@ -25,7 +28,6 @@ void onReceive(int packetSize) {
   digitalWrite(HAS_LED, HIGH);  
   
   packet = "";
-  packSize = String(packetSize,DEC);
   for (int i = 0; i < packetSize; i++) { 
     packet += (char) LoRa.read(); 
   }
@@ -48,7 +50,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
   Serial.println();
-  Serial.println("Domoticz-LoRa Base ver 0.1");
+  Serial.println("Domoticz-LoRa Base ver 0.2");
   
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
   LoRa.setPins(LORA_CS, LORA_RST, LORA_IRQ);
@@ -61,7 +63,16 @@ void setup() {
   display.init();
   display.flipScreenVertically();  
   display.setFont(ArialMT_Plain_10);
-   
+
+    //connect to WiFi
+    Serial.printf("Connecting to %s ", ssid);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println(" CONNECTED");
+       
   delay(1500);  
 
   // For interrupt-driven:
@@ -110,9 +121,8 @@ void recvWithStartEndMarkers() {
 
 void showNewCommand() {
     if (dataToSend == true) {
-        Serial.print("This just in ... ");
+        Serial.print("Received via serial: ");
         Serial.println(receivedChars);
-        dataToSend = false;
     }
 }
 
@@ -152,6 +162,7 @@ void loop() {
   if (dataToSend) {
     showNewCommand();
     sendLora(receivedChars);
+    dataToSend = false;
 
     counter++;
   }
@@ -160,7 +171,7 @@ void loop() {
   {
     Serial.print("Received: ");
     Serial.println(packet);
-    //packet = "";
+
     havePacket = false;
     digitalWrite(HAS_LED, LOW);  
   }
