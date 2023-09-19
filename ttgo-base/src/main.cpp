@@ -3,6 +3,9 @@
 #include <LoRa.h>
 #include <Wire.h>  
 #include <WiFi.h>
+#include <ArduinoHttpClient.h>
+#include <ArduinoJson.h>
+
 #include "SSD1306.h" 
 #include "ttgov21new.h"
 #include "Secrets/secrets.h"
@@ -10,12 +13,16 @@
 /*
   Detta är den enhet som ska sitta kopplad till Domoticz.
   Planen är att skriva en plugin som kommunicerar via usb uart.
+  2023-09-19: Lappkast, vi kan anropa Domoticz api istället.
   Koden är skriven för en Lilygo TTGO Lora32 V2.1_1.6
 */
 
 #define BAND  868E6
 
 SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
+
+WiFiClient wifiClient;
+HttpClient client = HttpClient(wifiClient, "192.168.1.101");
 
 unsigned int counter = 0;
 String rssi = "RSSI --";
@@ -72,7 +79,7 @@ void setup() {
     Serial.println(" CONNECTED");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
-           
+
   delay(1500);  
 
   // For interrupt-driven:
@@ -80,6 +87,39 @@ void setup() {
   LoRa.receive();
   
   Serial.println("listening...");
+}
+
+void pollDomoticz()
+{
+  Serial.println("Calling Domoticz");
+
+  client.beginRequest();
+  client.get("/json.htm?type=command&param=getdevices&rid=18");
+  client.sendHeader("Content-Type", "application/json");
+  // client.sendBasicAuth("username", "password");
+  client.endRequest();
+
+  int statusCode = client.responseStatusCode();
+  String responseBody = client.responseBody();
+  Serial.print("Response status: ");
+  Serial.println(statusCode);
+  //Serial.println("Response:\n" + responseBody);
+
+  DynamicJsonDocument doc(3072);
+
+  DeserializationError error = deserializeJson(doc, responseBody);
+
+  if (error) {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+
+  JsonObject result_0 = doc["result"][0];
+  const char* switchStatus = result_0["Data"];
+
+  Serial.print("Switchen är: ");
+  Serial.println(switchStatus);
 }
 
 const byte numChars = 32;
@@ -154,7 +194,9 @@ void sendLora(String msg)
 }
 
 void loop() {
-
+ pollDomoticz();
+    delay(10000);
+ /*
   recvWithStartEndMarkers();
 
   updateDisplay("-- LoRa Base node --");
@@ -175,7 +217,7 @@ void loop() {
     havePacket = false;
     digitalWrite(HAS_LED, LOW);  
   }
-
+*/
    delay(1000);
 }
 
