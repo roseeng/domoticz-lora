@@ -18,7 +18,12 @@ String rssi = "RSSI --";
 String packSize = "--";
 String packet ;
 
-void refreshScreen(){
+int command = 0; // 1 = Query, 2 = On, 3 = Off
+int lastCommand = 0;
+char myId = '1';
+
+void refreshScreen()
+{
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
@@ -26,6 +31,13 @@ void refreshScreen(){
   display.drawString(0 , 15 , "Received "+ packSize + " bytes");
   display.drawStringMaxWidth(0 , 26 , 128, packet);
   display.drawString(0, 38, rssi);  
+  if (lastCommand == 1)
+    display.drawString(0, 50, "Command: Query");
+  if (lastCommand == 2)
+    display.drawString(0, 50, "Command: On");
+  if (lastCommand == 3)
+    display.drawString(0, 50, "Command: Off");  
+
   display.display();
 }
 
@@ -38,6 +50,16 @@ void onReceive(int packetSize) {
     packet += (char) LoRa.read(); 
   }
   rssi = "RSSI " + String(LoRa.packetRssi(), DEC) ;
+
+  if (packet[0] == 'q' && packet[1] == myId)
+    command = 1;
+  if (packet[0] == 'n' && packet[1] == myId)
+    command = 2;  
+  if (packet[0] == 'f' && packet[1] == myId)
+    command = 3;  
+
+  if (command > 0)
+    lastCommand = command;
 }
 
 void setup() {
@@ -68,20 +90,25 @@ void setup() {
 
   display.init();
   display.flipScreenVertically();  
-  display.setFont(ArialMT_Plain_10);
-  
+  display.setFont(ArialMT_Plain_10);  
   delay(1500);
-
-  display.clear();
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.drawString(0, 0, "-- LoRa Beach node --"); 
-  display.display();
 
 // For interrupt-driven:
   LoRa.onReceive(onReceive);
   LoRa.receive();
   
   Serial.println("init ok - listening...");
+}
+
+void sendLora(String msg)
+{
+    // send packet
+    LoRa.beginPacket();
+    LoRa.print(msg);
+//    LoRa.print(counter);
+    LoRa.endPacket();
+
+    LoRa.receive();
 }
 
 void loop() {
@@ -92,8 +119,33 @@ void loop() {
   }
   delay(10);
   */
+
   refreshScreen();
   delay(1000);
   digitalWrite(HAS_LED, LOW);  
 //  delay(1000);
+
+  if (command ==  1)
+  {
+    Serial.println("Sending response");
+    sendLora("R142");
+
+    command = 0;
+  }
+
+  if (command ==  2)
+  {
+    Serial.println("Sending response");
+    sendLora("R1OK");
+
+    command = 0;
+  }
+
+  if (command ==  3)
+  {
+    Serial.println("Sending response");
+    sendLora("R1OK");
+
+    command = 0;
+  }    
 }

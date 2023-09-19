@@ -18,7 +18,21 @@ SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
 unsigned int counter = 0;
 String rssi = "RSSI --";
 String packSize = "--";
-String packet ;
+String packet;
+bool havePacket = false;
+
+void onReceive(int packetSize) {
+  digitalWrite(HAS_LED, HIGH);  
+  
+  packet = "";
+  packSize = String(packetSize,DEC);
+  for (int i = 0; i < packetSize; i++) { 
+    packet += (char) LoRa.read(); 
+  }
+  rssi = "RSSI " + String(LoRa.packetRssi(), DEC);
+
+  havePacket = true;
+}
 
 void setup() {
   pinMode(HAS_LED, OUTPUT);
@@ -49,32 +63,108 @@ void setup() {
   display.setFont(ArialMT_Plain_10);
    
   delay(1500);  
+
+  // For interrupt-driven:
+  LoRa.onReceive(onReceive);
+  LoRa.receive();
+  
+  Serial.println("listening...");
 }
 
-void loop() {
+const byte numChars = 32;
+char receivedChars[numChars];
+
+boolean dataToSend = false;
+
+void recvWithStartEndMarkers() {
+    static boolean recvInProgress = false;
+    static byte ndx = 0;
+    char startMarker = '<';
+    char endMarker = '>';
+    char rc;
+ 
+    while (Serial.available() > 0 && dataToSend == false) {
+        rc = Serial.read();
+
+        if (recvInProgress == true) {
+            if (rc != endMarker) {
+                receivedChars[ndx] = rc;
+                ndx++;
+                if (ndx >= numChars) {
+                    ndx = numChars - 1;
+                }
+            }
+            else {
+                receivedChars[ndx] = '\0'; // terminate the string
+                recvInProgress = false;
+                ndx = 0;
+                dataToSend = true;
+            }
+        }
+
+        else if (rc == startMarker) {
+            recvInProgress = true;
+        }
+    }
+}
+
+void showNewCommand() {
+    if (dataToSend == true) {
+        Serial.print("This just in ... ");
+        Serial.println(receivedChars);
+        dataToSend = false;
+    }
+}
+
+void updateDisplay(String header)
+{
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
-  
-  display.drawString(0, 0, "-- LoRa Base node --");
+
+  display.drawString(0, 0, header);
   display.drawString(0, 15, "Sending packet: ");
-  display.drawString(90, 15, String(counter));
-  Serial.println(String(counter));
-  display.display();
+  display.drawString(90, 15, receivedChars);
+  display.drawString(0, 26, rssi);   
+  display.drawString(0, 38, "Received: ");
+  display.drawString(90, 38, packet);
 
-  // send packet
-  LoRa.beginPacket();
-  LoRa.print("hello kotte ");
-  LoRa.print(counter);
-  LoRa.endPacket();
+  display.display();  
+}
 
-  counter++;
-  /*
-  digitalWrite(HAS_LED, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(1000);                       // wait for a second
-  digitalWrite(HAS_LED, LOW);    // turn the LED off by making the voltage LOW
-  delay(1000);                       // wait for a second
-  */
-   delay(2000);
+void sendLora(String msg)
+{
+    // send packet
+    LoRa.beginPacket();
+    LoRa.print(msg);
+//    LoRa.print(counter);
+    LoRa.endPacket();
+
+    LoRa.receive();
+}
+
+void loop() {
+
+  recvWithStartEndMarkers();
+
+  updateDisplay("-- LoRa Base node --");
+
+  if (dataToSend) {
+    showNewCommand();
+    sendLora(receivedChars);
+
+    counter++;
+  }
+
+  if (havePacket)
+  {
+    Serial.print("Received: ");
+    Serial.println(packet);
+    //packet = "";
+    havePacket = false;
+    digitalWrite(HAS_LED, LOW);  
+  }
+
+   delay(1000);
 }
 
