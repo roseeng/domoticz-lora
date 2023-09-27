@@ -45,7 +45,7 @@ void onReceive(int packetSize) {
   havePacket = true;
 }
 
-bool ConnectToWifi(String ssid, String password)
+bool ConnectToWifi(const char* ssid, const char* password)
 {
     Serial.printf("Connecting to %s... ", ssid);
     WiFi.begin(ssid, password);
@@ -121,6 +121,7 @@ int pollDomoticz()
   client->beginRequest();
   client->get(switchUrl);
   client->sendHeader("Content-Type", "application/json");
+  client->setTimeout(100);
   // client.sendBasicAuth("username", "password");
   client->endRequest();
 
@@ -153,6 +154,8 @@ int pollDomoticz()
   return status[1] == 'f' ? 0 : 1; 
 }
 
+String lastSentPacket = "";
+
 void updateDisplay(String header)
 {
   display.clear();
@@ -163,8 +166,10 @@ void updateDisplay(String header)
   display.drawString(0, 15, "Switch status: ");
   display.drawString(90, 15, String(switchStatus, DEC));
   display.drawString(0, 26, rssi);   
-  display.drawString(0, 38, "Received: ");
-  display.drawString(90, 38, packet);
+  display.drawString(0, 38, "Sent: ");
+  display.drawString(90, 38, lastSentPacket);
+  display.drawString(0, 49, "Received: ");
+  display.drawString(90, 49, packet);
 
   display.display();  
 }
@@ -175,11 +180,13 @@ void sendLora(String msg)
     LoRa.print(msg);
 //    LoRa.print(counter);
     LoRa.endPacket();
+    lastSentPacket = msg;
 
     LoRa.receive();
 }
 
 Interval switchInterval;
+Interval keepaliveInterval;
 
 void loop() {
   
@@ -196,6 +203,9 @@ void loop() {
       counter++;
     }
   }
+
+  if (keepaliveInterval.Every(20))
+    sendLora("p1");
 
   if (havePacket)
   {

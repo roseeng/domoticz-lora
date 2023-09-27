@@ -4,6 +4,7 @@
 #include <Wire.h>  
 #include "SSD1306.h" 
 #include "ttgov21new.h"
+#include "interval.h"
 
 /*
   Detta är den enhet som ska sitta på bryggan och tända/släcka lampor och mäta vattentemperatur.
@@ -22,6 +23,7 @@ int lastCommand = 0;
 char myId = '1';
 
 bool lampOn = false;
+unsigned long showLastCommand = 0;
 
 void refreshScreen()
 {
@@ -33,13 +35,16 @@ void refreshScreen()
 
   display.drawString(0, 26, rssi);  
 
-  if (lastCommand == 1)
-    display.drawString(0, 50, "Command: Query");
-  if (lastCommand == 2)
-    display.drawString(0, 50, "Command: On");
-  if (lastCommand == 3)
-    display.drawString(0, 50, "Command: Off");  
-
+  if (showLastCommand > 0 &&  millis() < showLastCommand + 15000) {
+    if (lastCommand == 1)
+      display.drawString(0, 50, "Command: Query");
+    if (lastCommand == 2)
+      display.drawString(0, 50, "Command: On");
+    if (lastCommand == 3)
+      display.drawString(0, 50, "Command: Off");  
+    if (lastCommand == 4)
+      display.drawString(0, 50, "Command: Ping");  
+  }
   display.display();
 }
 
@@ -51,15 +56,19 @@ void onReceive(int packetSize) {
   }
   rssi = "RSSI " + String(LoRa.packetRssi(), DEC) ;
 
-  if (packet[0] == 'q' && packet[1] == myId)
+  if (packet[0] == 'q' && packet[1] == myId) // Query
     command = 1;
-  if (packet[0] == 'n' && packet[1] == myId)
+  if (packet[0] == 'n' && packet[1] == myId) //oN
     command = 2;  
-  if (packet[0] == 'f' && packet[1] == myId)
+  if (packet[0] == 'f' && packet[1] == myId) // oFf
     command = 3;  
+  if (packet[0] == 'p' && packet[1] == myId) // Ping
+    command = 4;  
 
-  if (command > 0)
+  if (command > 0) {
     lastCommand = command;
+    showLastCommand = millis();
+  }
 }
 
 void setup() {
@@ -154,4 +163,13 @@ void loop() {
 
     command = 0;
   }    
+
+  if (command ==  4) // Ping
+  {
+    Serial.println("Command: Ping");
+    sendLora("R1OK");
+
+    command = 0;
+  }    
+
 }
