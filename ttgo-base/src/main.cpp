@@ -47,16 +47,20 @@ void onReceive(int packetSize) {
 
 bool ConnectToWifi(const char* ssid, const char* password)
 {
-    Serial.printf("Connecting to %s... ", ssid);
+    Serial.printf("Connecting to %s, pw %s... ", ssid, password);
     WiFi.begin(ssid, password);
     int retry = 20;
     while (WiFi.status() != WL_CONNECTED && retry-- > 0) {
         delay(500);
         Serial.print(".");
     }
-    if (WiFi.status() != WL_CONNECTED)
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println(" failed.");
+      int count = WiFi.scanNetworks();
+      Serial.printf("Found %d networks.\n", count);
       return false;
-    
+    }
+
     Serial.print("  CONNECTED to ");
     Serial.println(ssid);
     Serial.print("  IP address: ");
@@ -95,7 +99,7 @@ void setup() {
   if (ConnectToWifi(sites[0].ssid, sites[0].password)) {
     wifiSite = 0;
   }
-  else if (ConnectToWifi(sites[1].ssid, sites[2].password)) {
+  else if (ConnectToWifi(sites[1].ssid, sites[1].password)) {
     wifiSite = 1;
   }
   else {

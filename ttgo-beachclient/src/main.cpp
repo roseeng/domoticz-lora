@@ -3,17 +3,24 @@
 #include <LoRa.h>
 #include <Wire.h>  
 #include "SSD1306.h" 
-#include "ttgov21new.h"
+
+// Select TTGO Lora32 v1.0 or v2.1 (only one)
+#include "ttgov10.h" 
+//#include "ttgov21new.h"
+
 #include "interval.h"
 
 /*
   Detta är den enhet som ska sitta på bryggan och tända/släcka lampor och mäta vattentemperatur.
-  Koden är skriven för en Lilygo TTGO Lora32 V2.1_1.6
+  Koden är skriven för en Lilygo TTGO Lora32 V2.1_1.6 men kan konfigureras att funka med den gamla 1.0
 */
 
 #define BAND  868E6
 
+#define GR_HAVE_DISPLAY
+#ifdef GR_HAVE_DISPLAY
 SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
+#endif
 
 String rssi = "RSSI --";
 String packet ;
@@ -27,6 +34,7 @@ unsigned long showLastCommand = 0;
 
 void refreshScreen()
 {
+#ifdef GR_HAVE_DISPLAY  
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
@@ -46,6 +54,9 @@ void refreshScreen()
       display.drawString(0, 50, "Command: Ping");  
   }
   display.display();
+#else
+  Serial.println("No display");
+#endif
 }
 
 void onReceive(int packetSize) {  
@@ -72,9 +83,21 @@ void onReceive(int packetSize) {
 }
 
 void setup() {
-  pinMode(HAS_LED, OUTPUT);
-  digitalWrite(HAS_LED, LOW);  
+  if (OLED_RST != NOT_A_PIN)
+    pinMode(OLED_RST, OUTPUT);
+  
+  if (HAS_LED) {
+    pinMode(HAS_LED, OUTPUT);
+    digitalWrite(HAS_LED, LOW);  
+  }
 
+  Serial.begin(115200);
+  while (!Serial);
+  delay(1500);
+
+  Serial.println();
+  Serial.println("Domoticz-LoRa Beach node ver 0.3");
+  
   if (OLED_RST != NOT_A_PIN)
   {
     digitalWrite(OLED_RST, LOW);    // set GPIO16 low to reset OLED
@@ -82,13 +105,6 @@ void setup() {
     digitalWrite(OLED_RST, HIGH); // while OLED is running, must set GPIO16 in high、
   }
 
-  Serial.begin(115200);
-  while (!Serial);
-  delay(1500);
-
-  Serial.println();+
-  Serial.println("Domoticz-LoRa Beach node ver 0.2");
-  
   pinMode(LORA_IRQ, INPUT);
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
   LoRa.setPins(LORA_CS, LORA_RST, LORA_IRQ);  
@@ -97,9 +113,12 @@ void setup() {
     while (1);
   }
 
+#ifdef GR_HAVE_DISPLAY
   display.init();
   display.flipScreenVertically();  
   display.setFont(ArialMT_Plain_10);  
+#endif
+ 
   delay(1500);
 
 // For interrupt-driven:
