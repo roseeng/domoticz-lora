@@ -7,7 +7,8 @@
 
 #include <stdint.h>
 
-/*  Hardware related definitions for TTGO V2.1 Board
+/*  
+// Hardware related definitions for TTGO V2.1 Board
 // ATTENTION: check your board version!
 // This settings are for boards labeled v1.6 or v1.6.1 on pcb, NOT for v1.5 or older
 */

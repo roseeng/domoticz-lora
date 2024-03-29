@@ -2,11 +2,11 @@
 #include <SPI.h>
 #include <LoRa.h>
 #include <Wire.h>  
-#include "SSD1306.h" 
 
-// Select TTGO Lora32 v1.0 or v2.1 (only one)
-#include "ttgov10.h" 
+// Select TTGO Lora32 v1.0 or v2.1 eller mkrwan1300 (only one)
+//#include "ttgov10.h" 
 //#include "ttgov21new.h"
+#include "mkrwan1300.h"
 
 #include "interval.h"
 
@@ -17,7 +17,7 @@
 
 #define BAND  868E6
 
-#define GR_HAVE_DISPLAY
+//#define GR_HAVE_DISPLAY
 #ifdef GR_HAVE_DISPLAY
 SSD1306 display(0x3c, OLED_SDA, OLED_SCL);
 #endif
@@ -54,8 +54,6 @@ void refreshScreen()
       display.drawString(0, 50, "Command: Ping");  
   }
   display.display();
-#else
-  Serial.println("No display");
 #endif
 }
 
@@ -106,22 +104,28 @@ void setup() {
     digitalWrite(HAS_LED, LOW);  
   }
 
-
   WaitForSerial(15);
 
   Serial.println();
-  Serial.println("Domoticz-LoRa Beach node ver 0.3");
+  Serial.println("Domoticz-LoRa Beach node ver 0.4");
   
+#ifdef GR_HAVE_DISPLAY  
   if (OLED_RST != NOT_A_PIN)
   {
     digitalWrite(OLED_RST, LOW);    // set GPIO16 low to reset OLED
     delay(50); 
     digitalWrite(OLED_RST, HIGH); // while OLED is running, must set GPIO16 in high、
   }
+#else
+  Serial.println("No OLED display.");
+#endif
 
+#ifdef LORA_IRQ
   pinMode(LORA_IRQ, INPUT);
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
-  LoRa.setPins(LORA_CS, LORA_RST, LORA_IRQ);  
+  LoRa.setPins(LORA_CS, LORA_RST, LORA_IRQ);
+#endif  
+
   if (!LoRa.begin(BAND)) {
     Serial.println("Starting LoRa failed!");
     while (1);
@@ -135,10 +139,14 @@ void setup() {
  
   delay(1500);
 
+//  LoRa.dumpRegisters(Serial);
+
+#ifndef ARDUINO_SAMD_MKRWAN1300
 // For interrupt-driven:
   LoRa.onReceive(onReceive);
   LoRa.receive();
-  
+#endif
+
   Serial.println("init ok - listening...");
 }
 
@@ -149,17 +157,21 @@ void sendLora(String msg)
 //    LoRa.print(counter);
     LoRa.endPacket();
 
+#ifndef ARDUINO_SAMD_MKRWAN1300
     LoRa.receive();
+#endif 
+
 }
 
 void loop() {
   // For polling:
-/*  int packetSize = LoRa.parsePacket();
+#ifdef ARDUINO_SAMD_MKRWAN1300
+  int packetSize = LoRa.parsePacket();
   if (packetSize) { 
     onReceive(packetSize);  
   }
   delay(10);
-  */
+#endif
 
   refreshScreen();
   delay(1000);

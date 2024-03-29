@@ -90,6 +90,7 @@ void setup() {
     Serial.println("Starting LoRa failed!");
     while (1);
   }
+  LoRa.dumpRegisters(Serial);
 
   Serial.println("init ok");
   display.init();
@@ -208,8 +209,10 @@ void loop() {
     }
   }
 
-  if (keepaliveInterval.Every(20))
+  if (keepaliveInterval.Every(20)) {
+    Serial.println("Ping.");
     sendLora("p1");
+  }
 
   if (havePacket)
   {

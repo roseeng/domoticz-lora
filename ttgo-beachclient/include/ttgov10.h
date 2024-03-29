@@ -7,10 +7,12 @@
 
 #include <stdint.h>
 
-/*  Hardware related definitions for TTGO V1.0 Board
+/* 
+// Hardware related definitions for TTGO V1.0 Board
 // https://github.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/blob/master/assets/image/lora32_v1.0_pinmap.jpg
+// https://randomnerdtutorials.com/ttgo-lora32-sx1276-arduino-ide/
 // ATTENTION: check your board version!
-// This settings are for boards labeled v1.6 or v1.6.1 on pcb, NOT for v1.5 or older
+// These settings are for the first boards with no labelling
 */
 
 #define HAS_LORA         1 // comment out if device shall not send data via LoRa
@@ -27,8 +29,8 @@
 #define BAT_VOLTAGE_DIVIDER 2 // voltage divider 100k/100k on board
 
 // Pins for I2C interface of OLED Display
-#define OLED_SDA (21)
-#define OLED_SCL (22)
+#define OLED_SDA (4)
+#define OLED_SCL (15)
 #define OLED_RST (16)
 
 // Pins for LORA chip SPI interface, reset line and interrupt lines
